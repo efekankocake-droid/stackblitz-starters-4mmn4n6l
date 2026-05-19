@@ -4,8 +4,7 @@ import { useEffect, useState } from 'react'
 import { supabase } from './supabase'
 
 export default function Home() {
-  const bookingLink =
-    'https://stackblitzstarters4mmn4n6l-5wmw--3000--4c73681d.local-corp.webcontainer.io/randevu'
+  const bookingLink = 'https://stackblitz-starters-4mmn4n6l.vercel.app/randevu'
 
   const [name, setName] = useState('')
   const [price, setPrice] = useState('')
@@ -19,12 +18,20 @@ export default function Home() {
   const [selectedService, setSelectedService] = useState('')
 
   const getServices = async () => {
-    const { data } = await supabase.from('services').select('*').order('id', { ascending: false })
+    const { data } = await supabase
+      .from('services')
+      .select('*')
+      .order('id', { ascending: false })
+
     setServices(data || [])
   }
 
   const getAppointments = async () => {
-    const { data } = await supabase.from('appointments').select('*').order('id', { ascending: false })
+    const { data } = await supabase
+      .from('appointments')
+      .select('*')
+      .order('id', { ascending: false })
+
     setAppointments(data || [])
   }
 
@@ -43,16 +50,18 @@ export default function Home() {
       return
     }
 
-    const { error } = await supabase.from('services').insert([{ name, price, duration }])
+    const { error } = await supabase
+      .from('services')
+      .insert([{ name, price, duration }])
 
     if (error) {
       alert(error.message)
     } else {
-      alert('Hizmet eklendi 💅')
       setName('')
       setPrice('')
       setDuration('')
       getServices()
+      alert('Hizmet eklendi 💅')
     }
   }
 
@@ -62,30 +71,32 @@ export default function Home() {
       return
     }
 
-    const { error } = await supabase.from('appointments').insert([
-      {
-        client_name: clientName,
-        client_phone: clientPhone,
-        appointment_date: appointmentDate,
-        service_id: selectedService,
-      },
-    ])
+    const { error } = await supabase
+      .from('appointments')
+      .insert([
+        {
+          client_name: clientName,
+          client_phone: clientPhone,
+          appointment_date: appointmentDate,
+          service_id: selectedService,
+        },
+      ])
 
     if (error) {
       alert(error.message)
     } else {
-      alert('Randevu oluşturuldu ✅')
       setClientName('')
       setClientPhone('')
       setAppointmentDate('')
       setSelectedService('')
       getAppointments()
+      alert('Randevu oluşturuldu ✅')
     }
   }
 
   const copyBookingLink = () => {
     navigator.clipboard.writeText(bookingLink)
-    alert('Randevu linki kopyalandı ✅')
+    alert('Link kopyalandı ✅')
   }
 
   const sendWhatsAppReminder = (appointment: any) => {
@@ -100,141 +111,302 @@ export default function Home() {
   }
 
   return (
-    <main
-      style={{
-        minHeight: '100vh',
-        background: '#f7f7fb',
-        padding: 20,
-        fontFamily: 'Arial',
-      }}
-    >
-      <div style={{ maxWidth: 700, margin: '0 auto' }}>
-        <h1 style={{ fontSize: 32, marginBottom: 4 }}>GlowApp 💅</h1>
-        <p style={{ marginTop: 0, color: '#666' }}>
-          Nail & güzellik uzmanları için mini randevu sistemi
-        </p>
+    <main style={styles.page}>
+      <div style={styles.wrapper}>
+        <header style={styles.header}>
+          <div>
+            <p style={styles.badge}>Beauty SaaS MVP</p>
+            <h1 style={styles.title}>RandevuPro 💅</h1>
+            <p style={styles.subtitle}>
+              Nail & güzellik uzmanları için randevu, hizmet ve WhatsApp hatırlatma paneli.
+            </p>
+          </div>
 
-        <section style={cardStyle}>
-          <h2>Paylaşılacak Randevu Linki</h2>
+          <div style={styles.statBox}>
+            <b>{appointments.length}</b>
+            <span>Randevu</span>
+          </div>
+        </header>
 
-          <input style={inputStyle} readOnly value={bookingLink} />
+        <section style={styles.linkCard}>
+          <div>
+            <h2 style={styles.cardTitle}>Paylaşılacak Randevu Linki</h2>
+            <p style={styles.muted}>Bu linki Instagram bio’ya veya WhatsApp’a koy.</p>
+          </div>
 
-          <button style={buttonStyle} onClick={copyBookingLink}>
+          <input style={styles.input} readOnly value={bookingLink} />
+
+          <button style={styles.primaryButton} onClick={copyBookingLink}>
             Linki Kopyala
           </button>
         </section>
 
-        <section style={cardStyle}>
-          <h2>Hizmet Ekle</h2>
+        <div style={styles.grid}>
+          <section style={styles.card}>
+            <h2 style={styles.cardTitle}>Hizmet Ekle</h2>
 
-          <input style={inputStyle} placeholder="Hizmet adı" value={name} onChange={(e) => setName(e.target.value)} />
-          <input style={inputStyle} placeholder="Fiyat" value={price} onChange={(e) => setPrice(e.target.value)} />
-          <input style={inputStyle} placeholder="Süre dk" value={duration} onChange={(e) => setDuration(e.target.value)} />
+            <input
+              style={styles.input}
+              placeholder="Örn: Protez tırnak"
+              value={name}
+              onChange={(e) => setName(e.target.value)}
+            />
 
-          <button style={buttonStyle} onClick={addService}>Hizmet Ekle</button>
-        </section>
+            <input
+              style={styles.input}
+              placeholder="Fiyat örn: 1200"
+              value={price}
+              onChange={(e) => setPrice(e.target.value)}
+            />
 
-        <section style={cardStyle}>
-          <h2>Hizmetler</h2>
+            <input
+              style={styles.input}
+              placeholder="Süre dk örn: 120"
+              value={duration}
+              onChange={(e) => setDuration(e.target.value)}
+            />
 
-          {services.length === 0 && <p>Henüz hizmet yok.</p>}
+            <button style={styles.primaryButton} onClick={addService}>
+              Hizmet Ekle
+            </button>
+          </section>
 
-          {services.map((service) => (
-            <div key={service.id} style={listItemStyle}>
-              <b>{service.name}</b>
-              <p style={{ margin: '6px 0 0' }}>{service.price} TL - {service.duration} dk</p>
-            </div>
-          ))}
-        </section>
+          <section style={styles.card}>
+            <h2 style={styles.cardTitle}>Randevu Oluştur</h2>
 
-        <section style={cardStyle}>
-          <h2>Randevu Al</h2>
+            <select
+              style={styles.input}
+              value={selectedService}
+              onChange={(e) => setSelectedService(e.target.value)}
+            >
+              <option value="">Hizmet seç</option>
+              {services.map((service) => (
+                <option key={service.id} value={service.id}>
+                  {service.name} - {service.price} TL
+                </option>
+              ))}
+            </select>
 
-          <select style={inputStyle} value={selectedService} onChange={(e) => setSelectedService(e.target.value)}>
-            <option value="">Hizmet seç</option>
+            <input
+              style={styles.input}
+              placeholder="Müşteri adı"
+              value={clientName}
+              onChange={(e) => setClientName(e.target.value)}
+            />
+
+            <input
+              style={styles.input}
+              placeholder="Telefon örn: 5551234567"
+              value={clientPhone}
+              onChange={(e) => setClientPhone(e.target.value)}
+            />
+
+            <input
+              style={styles.input}
+              type="datetime-local"
+              value={appointmentDate}
+              onChange={(e) => setAppointmentDate(e.target.value)}
+            />
+
+            <button style={styles.primaryButton} onClick={addAppointment}>
+              Randevu Oluştur
+            </button>
+          </section>
+        </div>
+
+        <section style={styles.card}>
+          <h2 style={styles.cardTitle}>Hizmetler</h2>
+
+          {services.length === 0 && <p style={styles.muted}>Henüz hizmet yok.</p>}
+
+          <div style={styles.listGrid}>
             {services.map((service) => (
-              <option key={service.id} value={service.id}>
-                {service.name} - {service.price} TL
-              </option>
+              <div key={service.id} style={styles.serviceItem}>
+                <b>{service.name}</b>
+                <span>{service.price} TL</span>
+                <small>{service.duration} dk</small>
+              </div>
             ))}
-          </select>
-
-          <input style={inputStyle} placeholder="Müşteri adı" value={clientName} onChange={(e) => setClientName(e.target.value)} />
-          <input style={inputStyle} placeholder="Telefon örn: 5551234567" value={clientPhone} onChange={(e) => setClientPhone(e.target.value)} />
-          <input style={inputStyle} type="datetime-local" value={appointmentDate} onChange={(e) => setAppointmentDate(e.target.value)} />
-
-          <button style={buttonStyle} onClick={addAppointment}>Randevu Oluştur</button>
+          </div>
         </section>
 
-        <section style={cardStyle}>
-          <h2>Randevular</h2>
+        <section style={styles.card}>
+          <h2 style={styles.cardTitle}>Randevular</h2>
 
-          {appointments.length === 0 && <p>Henüz randevu yok.</p>}
+          {appointments.length === 0 && <p style={styles.muted}>Henüz randevu yok.</p>}
 
-          {appointments.map((appointment) => {
-            const service = findService(appointment.service_id)
+          <div style={styles.appointmentList}>
+            {appointments.map((appointment) => {
+              const service = findService(appointment.service_id)
 
-            return (
-              <div key={appointment.id} style={listItemStyle}>
-                <b>{appointment.client_name}</b>
-                <p style={{ margin: '6px 0' }}>📞 {appointment.client_phone}</p>
-                <p style={{ margin: '6px 0' }}>🗓️ {appointment.appointment_date}</p>
-                <p style={{ margin: '6px 0' }}>
-                  💅 {service ? `${service.name} - ${service.price} TL` : 'Hizmet bulunamadı'}
-                </p>
+              return (
+                <div key={appointment.id} style={styles.appointmentItem}>
+                  <div>
+                    <b>{appointment.client_name}</b>
+                    <p style={styles.muted}>📞 {appointment.client_phone}</p>
+                    <p style={styles.muted}>🗓️ {appointment.appointment_date}</p>
+                    <p style={styles.muted}>
+                      💅 {service ? `${service.name} - ${service.price} TL` : 'Hizmet bulunamadı'}
+                    </p>
+                  </div>
 
-                <button style={smallButtonStyle} onClick={() => sendWhatsAppReminder(appointment)}>
-                  WhatsApp Hatırlatma Gönder
-                </button>
-              </div>
-            )
-          })}
+                  <button
+                    style={styles.whatsappButton}
+                    onClick={() => sendWhatsAppReminder(appointment)}
+                  >
+                    WhatsApp
+                  </button>
+                </div>
+              )
+            })}
+          </div>
         </section>
       </div>
     </main>
   )
 }
 
-const cardStyle = {
-  background: 'white',
-  padding: 18,
-  borderRadius: 16,
-  marginBottom: 18,
-  boxShadow: '0 8px 24px rgba(0,0,0,0.06)',
-}
-
-const inputStyle = {
-  width: '100%',
-  padding: 12,
-  marginBottom: 10,
-  borderRadius: 10,
-  border: '1px solid #ddd',
-  fontSize: 15,
-}
-
-const buttonStyle = {
-  width: '100%',
-  padding: 13,
-  borderRadius: 10,
-  border: 'none',
-  background: '#111',
-  color: 'white',
-  fontSize: 16,
-  cursor: 'pointer',
-}
-
-const smallButtonStyle = {
-  padding: 10,
-  borderRadius: 10,
-  border: 'none',
-  background: '#25D366',
-  color: 'white',
-  cursor: 'pointer',
-}
-
-const listItemStyle = {
-  border: '1px solid #eee',
-  padding: 12,
-  borderRadius: 12,
-  marginBottom: 10,
+const styles: any = {
+  page: {
+    minHeight: '100vh',
+    background:
+      'linear-gradient(135deg, #fff7fb 0%, #f4f0ff 45%, #eef7ff 100%)',
+    color: '#151515',
+    fontFamily: 'Arial, sans-serif',
+    padding: 20,
+  },
+  wrapper: {
+    maxWidth: 980,
+    margin: '0 auto',
+  },
+  header: {
+    display: 'flex',
+    justifyContent: 'space-between',
+    gap: 16,
+    alignItems: 'center',
+    marginBottom: 20,
+  },
+  badge: {
+    display: 'inline-block',
+    background: '#111',
+    color: 'white',
+    padding: '7px 12px',
+    borderRadius: 999,
+    fontSize: 13,
+    marginBottom: 8,
+  },
+  title: {
+    fontSize: 42,
+    margin: 0,
+    color: '#111',
+  },
+  subtitle: {
+    color: '#555',
+    maxWidth: 560,
+    lineHeight: 1.5,
+  },
+  statBox: {
+    background: 'white',
+    borderRadius: 20,
+    padding: 18,
+    minWidth: 110,
+    textAlign: 'center',
+    boxShadow: '0 12px 30px rgba(0,0,0,0.08)',
+    display: 'flex',
+    flexDirection: 'column',
+    color: '#111',
+  },
+  linkCard: {
+    background: '#111',
+    color: 'white',
+    borderRadius: 24,
+    padding: 22,
+    marginBottom: 18,
+    boxShadow: '0 14px 35px rgba(0,0,0,0.14)',
+  },
+  grid: {
+    display: 'grid',
+    gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))',
+    gap: 18,
+  },
+  card: {
+    background: 'rgba(255,255,255,0.92)',
+    border: '1px solid rgba(255,255,255,0.8)',
+    borderRadius: 24,
+    padding: 22,
+    marginBottom: 18,
+    boxShadow: '0 14px 35px rgba(0,0,0,0.08)',
+    color: '#111',
+  },
+  cardTitle: {
+    marginTop: 0,
+    marginBottom: 12,
+    color: '#111',
+  },
+  input: {
+    width: '100%',
+    padding: 14,
+    marginBottom: 12,
+    borderRadius: 14,
+    border: '1px solid #ddd',
+    fontSize: 15,
+    color: '#111',
+    background: 'white',
+    boxSizing: 'border-box',
+  },
+  primaryButton: {
+    width: '100%',
+    padding: 14,
+    borderRadius: 14,
+    border: 'none',
+    background: '#111',
+    color: 'white',
+    fontSize: 16,
+    cursor: 'pointer',
+    fontWeight: 700,
+  },
+  whatsappButton: {
+    padding: '11px 14px',
+    borderRadius: 14,
+    border: 'none',
+    background: '#25D366',
+    color: 'white',
+    cursor: 'pointer',
+    fontWeight: 700,
+  },
+  muted: {
+    color: '#666',
+    margin: '5px 0',
+  },
+  listGrid: {
+    display: 'grid',
+    gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))',
+    gap: 12,
+  },
+  serviceItem: {
+    border: '1px solid #eee',
+    borderRadius: 18,
+    padding: 16,
+    display: 'flex',
+    flexDirection: 'column',
+    gap: 6,
+    background: 'white',
+    color: '#111',
+  },
+  appointmentList: {
+    display: 'flex',
+    flexDirection: 'column',
+    gap: 12,
+  },
+  appointmentItem: {
+    border: '1px solid #eee',
+    borderRadius: 18,
+    padding: 16,
+    background: 'white',
+    color: '#111',
+    display: 'flex',
+    justifyContent: 'space-between',
+    gap: 12,
+    alignItems: 'center',
+  },
 }
