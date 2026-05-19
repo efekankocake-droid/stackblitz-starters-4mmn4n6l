@@ -11,11 +11,12 @@ export default function RandevuPage() {
   const [selectedService, setSelectedService] = useState('')
 
   const getServices = async () => {
-    const { data } = await supabase
+    const { data, error } = await supabase
       .from('services')
       .select('*')
       .order('id', { ascending: false })
 
+    if (error) alert(error.message)
     setServices(data || [])
   }
 
@@ -50,20 +51,13 @@ export default function RandevuPage() {
   }
 
   return (
-    <main
-      style={{
-        minHeight: '100vh',
-        background: '#f7f7fb',
-        padding: 20,
-        fontFamily: 'Arial',
-      }}
-    >
+    <main style={pageStyle}>
       <div style={{ maxWidth: 520, margin: '0 auto' }}>
-        <h1 style={{ fontSize: 32, marginBottom: 4 }}>Randevu Al 💅</h1>
-        <p style={{ color: '#666' }}>Hizmet seç, bilgilerini gir, randevunu oluştur.</p>
+        <h1 style={titleStyle}>Randevu Al 💅</h1>
+        <p style={descStyle}>Hizmet seç, bilgilerini gir, randevunu oluştur.</p>
 
         <section style={cardStyle}>
-          <h2>Randevu Bilgileri</h2>
+          <h2 style={sectionTitle}>Randevu Bilgileri</h2>
 
           <select
             style={inputStyle}
@@ -71,7 +65,6 @@ export default function RandevuPage() {
             onChange={(e) => setSelectedService(e.target.value)}
           >
             <option value="">Hizmet seç</option>
-
             {services.map((service) => (
               <option key={service.id} value={service.id}>
                 {service.name} - {service.price} TL
@@ -109,12 +102,34 @@ export default function RandevuPage() {
   )
 }
 
+const pageStyle = {
+  minHeight: '100vh',
+  background: '#f7f7fb',
+  padding: 20,
+  fontFamily: 'Arial',
+  color: '#111',
+}
+
+const titleStyle = {
+  fontSize: 32,
+  marginBottom: 4,
+  color: '#111',
+}
+
+const descStyle = {
+  color: '#555',
+}
+
 const cardStyle = {
   background: 'white',
   padding: 18,
   borderRadius: 16,
-  marginBottom: 18,
+  marginTop: 18,
   boxShadow: '0 8px 24px rgba(0,0,0,0.06)',
+}
+
+const sectionTitle = {
+  color: '#111',
 }
 
 const inputStyle = {
@@ -124,6 +139,8 @@ const inputStyle = {
   borderRadius: 10,
   border: '1px solid #ddd',
   fontSize: 15,
+  color: '#111',
+  background: 'white',
 }
 
 const buttonStyle = {
