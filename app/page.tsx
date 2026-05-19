@@ -4,7 +4,9 @@ import { useEffect, useState } from 'react'
 import { supabase } from './supabase'
 
 export default function Home() {
-  const bookingLink = 'https://stackblitz-starters-4mmn4n6l.vercel.app/randevu'
+  const [businessName, setBusinessName] = useState('')
+  const [businessSlug, setBusinessSlug] = useState('')
+  const [currentBusiness, setCurrentBusiness] = useState<any>(null)
 
   const [name, setName] = useState('')
   const [price, setPrice] = useState('')
@@ -17,42 +19,96 @@ export default function Home() {
   const [appointmentDate, setAppointmentDate] = useState('')
   const [selectedService, setSelectedService] = useState('')
 
-  const getServices = async () => {
+  const bookingLink = currentBusiness
+    ? `https://stackblitz-starters-4mmn4n6l.vercel.app/randevu?business=${currentBusiness.slug}`
+    : 'Önce işletme oluştur'
+
+  const getServices = async (businessId = currentBusiness?.id) => {
+    if (!businessId) return
+
     const { data } = await supabase
       .from('services')
       .select('*')
+      .eq('business_id', businessId)
       .order('id', { ascending: false })
 
     setServices(data || [])
   }
 
-  const getAppointments = async () => {
+  const getAppointments = async (businessId = currentBusiness?.id) => {
+    if (!businessId) return
+
     const { data } = await supabase
       .from('appointments')
       .select('*')
+      .eq('business_id', businessId)
       .order('id', { ascending: false })
 
     setAppointments(data || [])
   }
 
-  useEffect(() => {
-    getServices()
-    getAppointments()
-  }, [])
+  const createBusiness = async () => {
+    if (!businessName || !businessSlug) {
+      alert('İşletme adı ve link adı gir')
+      return
+    }
+
+    const cleanSlug = businessSlug
+      .toLowerCase()
+      .trim()
+      .replaceAll(' ', '-')
+      .replaceAll('ı', 'i')
+      .replaceAll('ğ', 'g')
+      .replaceAll('ü', 'u')
+      .replaceAll('ş', 's')
+      .replaceAll('ö', 'o')
+      .replaceAll('ç', 'c')
+
+    const { data, error } = await supabase
+      .from('businesses')
+      .insert([
+        {
+          business_name: businessName,
+          slug: cleanSlug,
+          plan: 'free',
+        },
+      ])
+      .select()
+      .single()
+
+    if (error) {
+      alert(error.message)
+    } else {
+      setCurrentBusiness(data)
+      setBusinessName('')
+      setBusinessSlug('')
+      alert('İşletme oluşturuldu 🚀')
+    }
+  }
 
   const findService = (serviceId: string) => {
     return services.find((service) => String(service.id) === String(serviceId))
   }
 
   const addService = async () => {
+    if (!currentBusiness) {
+      alert('Önce işletme oluştur')
+      return
+    }
+
     if (!name || !price || !duration) {
       alert('Hizmet adı, fiyat ve süre gir')
       return
     }
 
-    const { error } = await supabase
-      .from('services')
-      .insert([{ name, price, duration }])
+    const { error } = await supabase.from('services').insert([
+      {
+        name,
+        price,
+        duration,
+        business_id: currentBusiness.id,
+      },
+    ])
 
     if (error) {
       alert(error.message)
@@ -60,27 +116,31 @@ export default function Home() {
       setName('')
       setPrice('')
       setDuration('')
-      getServices()
+      getServices(currentBusiness.id)
       alert('Hizmet eklendi 💅')
     }
   }
 
   const addAppointment = async () => {
+    if (!currentBusiness) {
+      alert('Önce işletme oluştur')
+      return
+    }
+
     if (!selectedService || !clientName || !clientPhone || !appointmentDate) {
       alert('Tüm randevu alanlarını doldur')
       return
     }
 
-    const { error } = await supabase
-      .from('appointments')
-      .insert([
-        {
-          client_name: clientName,
-          client_phone: clientPhone,
-          appointment_date: appointmentDate,
-          service_id: selectedService,
-        },
-      ])
+    const { error } = await supabase.from('appointments').insert([
+      {
+        client_name: clientName,
+        client_phone: clientPhone,
+        appointment_date: appointmentDate,
+        service_id: selectedService,
+        business_id: currentBusiness.id,
+      },
+    ])
 
     if (error) {
       alert(error.message)
@@ -89,12 +149,17 @@ export default function Home() {
       setClientPhone('')
       setAppointmentDate('')
       setSelectedService('')
-      getAppointments()
+      getAppointments(currentBusiness.id)
       alert('Randevu oluşturuldu ✅')
     }
   }
 
   const copyBookingLink = () => {
+    if (!currentBusiness) {
+      alert('Önce işletme oluştur')
+      return
+    }
+
     navigator.clipboard.writeText(bookingLink)
     alert('Link kopyalandı ✅')
   }
@@ -118,7 +183,7 @@ export default function Home() {
             <p style={styles.badge}>Beauty SaaS MVP</p>
             <h1 style={styles.title}>RandevuPro 💅</h1>
             <p style={styles.subtitle}>
-              Nail & güzellik uzmanları için randevu, hizmet ve WhatsApp hatırlatma paneli.
+              Her işletmeye özel randevu linki, hizmet yönetimi ve WhatsApp hatırlatma paneli.
             </p>
           </div>
 
@@ -128,15 +193,44 @@ export default function Home() {
           </div>
         </header>
 
+        <section style={styles.card}>
+          <h2 style={styles.cardTitle}>İşletme Oluştur</h2>
+
+          <input
+            style={styles.input}
+            placeholder="İşletme adı örn: Ayşe Nail Studio"
+            value={businessName}
+            onChange={(e) => setBusinessName(e.target.value)}
+          />
+
+          <input
+            style={styles.input}
+            placeholder="Link adı örn: ayse-nail"
+            value={businessSlug}
+            onChange={(e) => setBusinessSlug(e.target.value)}
+          />
+
+          <button style={styles.primaryButton} onClick={createBusiness}>
+            İşletme Oluştur
+          </button>
+
+          {currentBusiness && (
+            <div style={styles.successBox}>
+              <b>{currentBusiness.business_name}</b>
+              <p>Plan: {currentBusiness.plan}</p>
+            </div>
+          )}
+        </section>
+
         <section style={styles.linkCard}>
           <div>
-            <h2 style={styles.cardTitle}>Paylaşılacak Randevu Linki</h2>
-            <p style={styles.muted}>Bu linki Instagram bio’ya veya WhatsApp’a koy.</p>
+            <h2 style={{ ...styles.cardTitle, color: 'white' }}>Paylaşılacak Randevu Linki</h2>
+            <p style={{ color: '#ddd' }}>Bu linki Instagram bio’ya veya WhatsApp’a koy.</p>
           </div>
 
           <input style={styles.input} readOnly value={bookingLink} />
 
-          <button style={styles.primaryButton} onClick={copyBookingLink}>
+          <button style={styles.whiteButton} onClick={copyBookingLink}>
             Linki Kopyala
           </button>
         </section>
@@ -217,7 +311,11 @@ export default function Home() {
         <section style={styles.card}>
           <h2 style={styles.cardTitle}>Hizmetler</h2>
 
-          {services.length === 0 && <p style={styles.muted}>Henüz hizmet yok.</p>}
+          {!currentBusiness && <p style={styles.muted}>Önce işletme oluştur.</p>}
+
+          {currentBusiness && services.length === 0 && (
+            <p style={styles.muted}>Bu işletmeye henüz hizmet eklenmedi.</p>
+          )}
 
           <div style={styles.listGrid}>
             {services.map((service) => (
@@ -233,7 +331,11 @@ export default function Home() {
         <section style={styles.card}>
           <h2 style={styles.cardTitle}>Randevular</h2>
 
-          {appointments.length === 0 && <p style={styles.muted}>Henüz randevu yok.</p>}
+          {!currentBusiness && <p style={styles.muted}>Önce işletme oluştur.</p>}
+
+          {currentBusiness && appointments.length === 0 && (
+            <p style={styles.muted}>Bu işletmeye henüz randevu yok.</p>
+          )}
 
           <div style={styles.appointmentList}>
             {appointments.map((appointment) => {
@@ -269,8 +371,7 @@ export default function Home() {
 const styles: any = {
   page: {
     minHeight: '100vh',
-    background:
-      'linear-gradient(135deg, #fff7fb 0%, #f4f0ff 45%, #eef7ff 100%)',
+    background: 'linear-gradient(135deg, #fff7fb 0%, #f4f0ff 45%, #eef7ff 100%)',
     color: '#151515',
     fontFamily: 'Arial, sans-serif',
     padding: 20,
@@ -365,6 +466,17 @@ const styles: any = {
     cursor: 'pointer',
     fontWeight: 700,
   },
+  whiteButton: {
+    width: '100%',
+    padding: 14,
+    borderRadius: 14,
+    border: 'none',
+    background: 'white',
+    color: '#111',
+    fontSize: 16,
+    cursor: 'pointer',
+    fontWeight: 700,
+  },
   whatsappButton: {
     padding: '11px 14px',
     borderRadius: 14,
@@ -377,6 +489,14 @@ const styles: any = {
   muted: {
     color: '#666',
     margin: '5px 0',
+  },
+  successBox: {
+    marginTop: 12,
+    background: '#ecfff3',
+    border: '1px solid #baf7ce',
+    borderRadius: 14,
+    padding: 12,
+    color: '#111',
   },
   listGrid: {
     display: 'grid',
