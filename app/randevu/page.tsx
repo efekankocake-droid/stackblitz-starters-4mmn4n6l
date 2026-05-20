@@ -4,27 +4,51 @@ import { useEffect, useState } from 'react'
 import { supabase } from '../supabase'
 
 export default function RandevuPage() {
+  const [business, setBusiness] = useState<any>(null)
   const [services, setServices] = useState<any[]>([])
+  const [selectedService, setSelectedService] = useState('')
   const [clientName, setClientName] = useState('')
   const [clientPhone, setClientPhone] = useState('')
   const [appointmentDate, setAppointmentDate] = useState('')
-  const [selectedService, setSelectedService] = useState('')
 
-  const getServices = async () => {
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search)
+    const slug = params.get('business')
+
+    if (slug) {
+      getBusiness(slug)
+    }
+  }, [])
+
+  const getBusiness = async (slug: string) => {
     const { data, error } = await supabase
+      .from('businesses')
+      .select('*')
+      .eq('slug', slug)
+      .single()
+
+    if (error) {
+      alert('İşletme bulunamadı')
+      return
+    }
+
+    setBusiness(data)
+    getServices(data.id)
+  }
+
+  const getServices = async (businessId: number) => {
+    const { data } = await supabase
       .from('services')
       .select('*')
+      .eq('business_id', businessId)
       .order('id', { ascending: false })
 
-    if (error) alert(error.message)
     setServices(data || [])
   }
 
-  useEffect(() => {
-    getServices()
-  }, [])
+  const createAppointment = async () => {
+    if (!business) return alert('İşletme bulunamadı')
 
-  const addAppointment = async () => {
     if (!selectedService || !clientName || !clientPhone || !appointmentDate) {
       alert('Lütfen tüm alanları doldurun')
       return
@@ -32,124 +56,138 @@ export default function RandevuPage() {
 
     const { error } = await supabase.from('appointments').insert([
       {
+        business_id: business.id,
+        service_id: selectedService,
         client_name: clientName,
         client_phone: clientPhone,
         appointment_date: appointmentDate,
-        service_id: selectedService,
       },
     ])
 
     if (error) {
       alert(error.message)
-    } else {
-      alert('Randevunuz oluşturuldu ✅')
-      setClientName('')
-      setClientPhone('')
-      setAppointmentDate('')
-      setSelectedService('')
+      return
     }
+
+    alert('Randevunuz oluşturuldu ✅')
+
+    setSelectedService('')
+    setClientName('')
+    setClientPhone('')
+    setAppointmentDate('')
+  }
+
+  if (!business) {
+    return (
+      <main style={styles.page}>
+        <div style={styles.card}>
+          <h1 style={styles.title}>RandevuPro 💅</h1>
+          <p style={styles.text}>İşletme yükleniyor...</p>
+        </div>
+      </main>
+    )
   }
 
   return (
-    <main style={pageStyle}>
-      <div style={{ maxWidth: 520, margin: '0 auto' }}>
-        <h1 style={titleStyle}>Randevu Al 💅</h1>
-        <p style={descStyle}>Hizmet seç, bilgilerini gir, randevunu oluştur.</p>
+    <main style={styles.page}>
+      <div style={styles.card}>
+        <h1 style={styles.title}>{business.business_name}</h1>
 
-        <section style={cardStyle}>
-          <h2 style={sectionTitle}>Randevu Bilgileri</h2>
+        <p style={styles.text}>
+          Hizmet seç, bilgilerini gir, randevunu oluştur.
+        </p>
 
-          <select
-            style={inputStyle}
-            value={selectedService}
-            onChange={(e) => setSelectedService(e.target.value)}
-          >
-            <option value="">Hizmet seç</option>
-            {services.map((service) => (
-              <option key={service.id} value={service.id}>
-                {service.name} - {service.price} TL
-              </option>
-            ))}
-          </select>
+        <select
+          style={styles.input}
+          value={selectedService}
+          onChange={(e) => setSelectedService(e.target.value)}
+        >
+          <option value="">Hizmet seç</option>
 
-          <input
-            style={inputStyle}
-            placeholder="Ad Soyad"
-            value={clientName}
-            onChange={(e) => setClientName(e.target.value)}
-          />
+          {services.map((service) => (
+            <option key={service.id} value={service.id}>
+              {service.name} - {service.price} TL
+            </option>
+          ))}
+        </select>
 
-          <input
-            style={inputStyle}
-            placeholder="Telefon"
-            value={clientPhone}
-            onChange={(e) => setClientPhone(e.target.value)}
-          />
+        <input
+          style={styles.input}
+          placeholder="Ad Soyad"
+          value={clientName}
+          onChange={(e) => setClientName(e.target.value)}
+        />
 
-          <input
-            style={inputStyle}
-            type="datetime-local"
-            value={appointmentDate}
-            onChange={(e) => setAppointmentDate(e.target.value)}
-          />
+        <input
+          style={styles.input}
+          placeholder="Telefon"
+          value={clientPhone}
+          onChange={(e) => setClientPhone(e.target.value)}
+        />
 
-          <button style={buttonStyle} onClick={addAppointment}>
-            Randevu Oluştur
-          </button>
-        </section>
+        <input
+          style={styles.input}
+          type="datetime-local"
+          value={appointmentDate}
+          onChange={(e) => setAppointmentDate(e.target.value)}
+        />
+
+        <button style={styles.button} onClick={createAppointment}>
+          Randevu Oluştur
+        </button>
       </div>
     </main>
   )
 }
 
-const pageStyle = {
-  minHeight: '100vh',
-  background: '#f7f7fb',
-  padding: 20,
-  fontFamily: 'Arial',
-  color: '#111',
-}
-
-const titleStyle = {
-  fontSize: 32,
-  marginBottom: 4,
-  color: '#111',
-}
-
-const descStyle = {
-  color: '#555',
-}
-
-const cardStyle = {
-  background: 'white',
-  padding: 18,
-  borderRadius: 16,
-  marginTop: 18,
-  boxShadow: '0 8px 24px rgba(0,0,0,0.06)',
-}
-
-const sectionTitle = {
-  color: '#111',
-}
-
-const inputStyle = {
-  width: '100%',
-  padding: 12,
-  marginBottom: 10,
-  borderRadius: 10,
-  border: '1px solid #ddd',
-  fontSize: 15,
-  color: '#111',
-  background: 'white',
-}
-
-const buttonStyle = {
-  width: '100%',
-  padding: 13,
-  borderRadius: 10,
-  border: 'none',
-  background: '#111',
-  color: 'white',
-  fontSize: 16,
-  cursor: 'pointer',
+const styles: any = {
+  page: {
+    minHeight: '100vh',
+    background: 'linear-gradient(135deg, #fff7fb 0%, #f4f0ff 45%, #eef7ff 100%)',
+    display: 'flex',
+    justifyContent: 'center',
+    alignItems: 'center',
+    padding: 20,
+    fontFamily: 'Arial',
+    color: '#111',
+  },
+  card: {
+    width: '100%',
+    maxWidth: 520,
+    background: 'white',
+    borderRadius: 24,
+    padding: 28,
+    boxShadow: '0 14px 35px rgba(0,0,0,0.08)',
+  },
+  title: {
+    fontSize: 34,
+    marginBottom: 8,
+    color: '#111',
+  },
+  text: {
+    color: '#666',
+    marginBottom: 20,
+  },
+  input: {
+    width: '100%',
+    padding: 14,
+    marginBottom: 12,
+    borderRadius: 14,
+    border: '1px solid #ddd',
+    fontSize: 15,
+    color: '#111',
+    background: 'white',
+    boxSizing: 'border-box',
+  },
+  button: {
+    width: '100%',
+    padding: 14,
+    borderRadius: 14,
+    border: 'none',
+    background: '#111',
+    color: 'white',
+    fontSize: 16,
+    cursor: 'pointer',
+    fontWeight: 700,
+  },
 }

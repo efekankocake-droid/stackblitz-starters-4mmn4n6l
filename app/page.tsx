@@ -4,54 +4,68 @@ import { useEffect, useState } from 'react'
 import { supabase } from './supabase'
 
 export default function Home() {
+  const [session, setSession] = useState<any>(null)
+  const [email, setEmail] = useState('')
+  const [password, setPassword] = useState('')
+
   const [businessName, setBusinessName] = useState('')
   const [businessSlug, setBusinessSlug] = useState('')
-  const [currentBusiness, setCurrentBusiness] = useState<any>(null)
+  const [business, setBusiness] = useState<any>(null)
 
-  const [name, setName] = useState('')
-  const [price, setPrice] = useState('')
-  const [duration, setDuration] = useState('')
+  const [serviceName, setServiceName] = useState('')
+  const [servicePrice, setServicePrice] = useState('')
+  const [serviceDuration, setServiceDuration] = useState('')
   const [services, setServices] = useState<any[]>([])
   const [appointments, setAppointments] = useState<any[]>([])
 
-  const [clientName, setClientName] = useState('')
-  const [clientPhone, setClientPhone] = useState('')
-  const [appointmentDate, setAppointmentDate] = useState('')
-  const [selectedService, setSelectedService] = useState('')
+  useEffect(() => {
+    supabase.auth.getSession().then(({ data }) => {
+      setSession(data.session)
+      if (data.session) getBusiness(data.session.user)
+    })
 
-  const bookingLink = currentBusiness
-    ? `https://stackblitz-starters-4mmn4n6l.vercel.app/randevu?business=${currentBusiness.slug}`
-    : 'Önce işletme oluştur'
+    const { data } = supabase.auth.onAuthStateChange((_event, session) => {
+      setSession(session)
+      if (session) getBusiness(session.user)
+    })
 
-  const getServices = async (businessId = currentBusiness?.id) => {
-    if (!businessId) return
+    return () => data.subscription.unsubscribe()
+  }, [])
 
-    const { data } = await supabase
-      .from('services')
-      .select('*')
-      .eq('business_id', businessId)
-      .order('id', { ascending: false })
-
-    setServices(data || [])
+  const signUp = async () => {
+    const { error } = await supabase.auth.signUp({ email, password })
+    if (error) alert(error.message)
+    else alert('Kayıt oluşturuldu ✅')
   }
 
-  const getAppointments = async (businessId = currentBusiness?.id) => {
-    if (!businessId) return
+  const signIn = async () => {
+    const { error } = await supabase.auth.signInWithPassword({ email, password })
+    if (error) alert(error.message)
+  }
 
+  const signOut = async () => {
+    await supabase.auth.signOut()
+    setBusiness(null)
+    setServices([])
+    setAppointments([])
+  }
+
+  const getBusiness = async (user: any) => {
     const { data } = await supabase
-      .from('appointments')
+      .from('businesses')
       .select('*')
-      .eq('business_id', businessId)
-      .order('id', { ascending: false })
+      .eq('owner_id', user.id)
+      .maybeSingle()
 
-    setAppointments(data || [])
+    if (data) {
+      setBusiness(data)
+      getServices(data.id)
+      getAppointments(data.id)
+    }
   }
 
   const createBusiness = async () => {
-    if (!businessName || !businessSlug) {
-      alert('İşletme adı ve link adı gir')
-      return
-    }
+    if (!businessName || !businessSlug) return alert('İşletme adı ve link adı gir')
 
     const cleanSlug = businessSlug
       .toLowerCase()
@@ -66,303 +80,168 @@ export default function Home() {
 
     const { data, error } = await supabase
       .from('businesses')
-      .insert([
-        {
-          business_name: businessName,
-          slug: cleanSlug,
-          plan: 'free',
-        },
-      ])
+      .insert([{
+        business_name: businessName,
+        slug: cleanSlug,
+        owner_id: session.user.id,
+        owner_email: session.user.email,
+        plan: 'free',
+      }])
       .select()
       .single()
 
-    if (error) {
-      alert(error.message)
-    } else {
-      setCurrentBusiness(data)
-      setBusinessName('')
-      setBusinessSlug('')
-      alert('İşletme oluşturuldu 🚀')
-    }
+    if (error) return alert(error.message)
+
+    setBusiness(data)
+    setBusinessName('')
+    setBusinessSlug('')
+    alert('İşletme oluşturuldu 🚀')
+  }
+
+  const getServices = async (businessId: number) => {
+    const { data } = await supabase
+      .from('services')
+      .select('*')
+      .eq('business_id', businessId)
+      .order('id', { ascending: false })
+
+    setServices(data || [])
+  }
+
+  const getAppointments = async (businessId: number) => {
+    const { data } = await supabase
+      .from('appointments')
+      .select('*')
+      .eq('business_id', businessId)
+      .order('id', { ascending: false })
+
+    setAppointments(data || [])
+  }
+
+  const addService = async () => {
+    if (!business) return alert('Önce işletme oluştur')
+    if (!serviceName || !servicePrice || !serviceDuration) return alert('Hizmet bilgilerini doldur')
+
+    const { error } = await supabase.from('services').insert([{
+      name: serviceName,
+      price: servicePrice,
+      duration: serviceDuration,
+      business_id: business.id,
+    }])
+
+    if (error) return alert(error.message)
+
+    setServiceName('')
+    setServicePrice('')
+    setServiceDuration('')
+    getServices(business.id)
+    alert('Hizmet eklendi 💅')
   }
 
   const findService = (serviceId: string) => {
     return services.find((service) => String(service.id) === String(serviceId))
   }
 
-  const addService = async () => {
-    if (!currentBusiness) {
-      alert('Önce işletme oluştur')
-      return
-    }
-
-    if (!name || !price || !duration) {
-      alert('Hizmet adı, fiyat ve süre gir')
-      return
-    }
-
-    const { error } = await supabase.from('services').insert([
-      {
-        name,
-        price,
-        duration,
-        business_id: currentBusiness.id,
-      },
-    ])
-
-    if (error) {
-      alert(error.message)
-    } else {
-      setName('')
-      setPrice('')
-      setDuration('')
-      getServices(currentBusiness.id)
-      alert('Hizmet eklendi 💅')
-    }
-  }
-
-  const addAppointment = async () => {
-    if (!currentBusiness) {
-      alert('Önce işletme oluştur')
-      return
-    }
-
-    if (!selectedService || !clientName || !clientPhone || !appointmentDate) {
-      alert('Tüm randevu alanlarını doldur')
-      return
-    }
-
-    const { error } = await supabase.from('appointments').insert([
-      {
-        client_name: clientName,
-        client_phone: clientPhone,
-        appointment_date: appointmentDate,
-        service_id: selectedService,
-        business_id: currentBusiness.id,
-      },
-    ])
-
-    if (error) {
-      alert(error.message)
-    } else {
-      setClientName('')
-      setClientPhone('')
-      setAppointmentDate('')
-      setSelectedService('')
-      getAppointments(currentBusiness.id)
-      alert('Randevu oluşturuldu ✅')
-    }
-  }
-
-  const copyBookingLink = () => {
-    if (!currentBusiness) {
-      alert('Önce işletme oluştur')
-      return
-    }
-
-    navigator.clipboard.writeText(bookingLink)
-    alert('Link kopyalandı ✅')
-  }
-
-  const sendWhatsAppReminder = (appointment: any) => {
+  const sendWhatsApp = (appointment: any) => {
     const service = findService(appointment.service_id)
-
-    const message = `Merhaba ${appointment.client_name} 🌸 Randevunuzu hatırlatmak isteriz. Tarih/Saat: ${appointment.appointment_date}. Hizmet: ${
-      service ? service.name : 'Seçilen hizmet'
-    }. Görüşmek üzere 💅`
-
+    const message = `Merhaba ${appointment.client_name} 🌸 Randevunuzu hatırlatmak isteriz. Tarih/Saat: ${appointment.appointment_date}. Hizmet: ${service ? service.name : 'Hizmet'}. Görüşmek üzere 💅`
     const phone = appointment.client_phone.replace(/\D/g, '')
     window.open(`https://wa.me/90${phone}?text=${encodeURIComponent(message)}`, '_blank')
+  }
+
+  if (!session) {
+    return (
+      <main style={styles.page}>
+        <div style={styles.card}>
+          <h1 style={styles.title}>RandevuPro 🚀</h1>
+          <p style={styles.text}>Giriş yap veya kayıt ol</p>
+
+          <input style={styles.input} placeholder="Email" value={email} onChange={(e) => setEmail(e.target.value)} />
+          <input style={styles.input} placeholder="Şifre" type="password" value={password} onChange={(e) => setPassword(e.target.value)} />
+
+          <button style={styles.button} onClick={signIn}>Giriş Yap</button>
+          <button style={styles.secondaryButton} onClick={signUp}>Kayıt Ol</button>
+        </div>
+      </main>
+    )
   }
 
   return (
     <main style={styles.page}>
       <div style={styles.wrapper}>
-        <header style={styles.header}>
-          <div>
-            <p style={styles.badge}>Beauty SaaS MVP</p>
-            <h1 style={styles.title}>RandevuPro 💅</h1>
-            <p style={styles.subtitle}>
-              Her işletmeye özel randevu linki, hizmet yönetimi ve WhatsApp hatırlatma paneli.
-            </p>
-          </div>
+        <div style={styles.card}>
+          <h1 style={styles.title}>RandevuPro 💅</h1>
+          <p style={styles.text}>Hoş geldin: {session.user.email}</p>
 
-          <div style={styles.statBox}>
-            <b>{appointments.length}</b>
-            <span>Randevu</span>
-          </div>
-        </header>
+          {!business ? (
+            <>
+              <h2 style={styles.sectionTitle}>İşletmeni Oluştur</h2>
 
-        <section style={styles.card}>
-          <h2 style={styles.cardTitle}>İşletme Oluştur</h2>
+              <input style={styles.input} placeholder="İşletme adı" value={businessName} onChange={(e) => setBusinessName(e.target.value)} />
+              <input style={styles.input} placeholder="Link adı örn: ayse-nail" value={businessSlug} onChange={(e) => setBusinessSlug(e.target.value)} />
 
-          <input
-            style={styles.input}
-            placeholder="İşletme adı örn: Ayşe Nail Studio"
-            value={businessName}
-            onChange={(e) => setBusinessName(e.target.value)}
-          />
-
-          <input
-            style={styles.input}
-            placeholder="Link adı örn: ayse-nail"
-            value={businessSlug}
-            onChange={(e) => setBusinessSlug(e.target.value)}
-          />
-
-          <button style={styles.primaryButton} onClick={createBusiness}>
-            İşletme Oluştur
-          </button>
-
-          {currentBusiness && (
-            <div style={styles.successBox}>
-              <b>{currentBusiness.business_name}</b>
-              <p>Plan: {currentBusiness.plan}</p>
-            </div>
-          )}
-        </section>
-
-        <section style={styles.linkCard}>
-          <div>
-            <h2 style={{ ...styles.cardTitle, color: 'white' }}>Paylaşılacak Randevu Linki</h2>
-            <p style={{ color: '#ddd' }}>Bu linki Instagram bio’ya veya WhatsApp’a koy.</p>
-          </div>
-
-          <input style={styles.input} readOnly value={bookingLink} />
-
-          <button style={styles.whiteButton} onClick={copyBookingLink}>
-            Linki Kopyala
-          </button>
-        </section>
-
-        <div style={styles.grid}>
-          <section style={styles.card}>
-            <h2 style={styles.cardTitle}>Hizmet Ekle</h2>
-
-            <input
-              style={styles.input}
-              placeholder="Örn: Protez tırnak"
-              value={name}
-              onChange={(e) => setName(e.target.value)}
-            />
-
-            <input
-              style={styles.input}
-              placeholder="Fiyat örn: 1200"
-              value={price}
-              onChange={(e) => setPrice(e.target.value)}
-            />
-
-            <input
-              style={styles.input}
-              placeholder="Süre dk örn: 120"
-              value={duration}
-              onChange={(e) => setDuration(e.target.value)}
-            />
-
-            <button style={styles.primaryButton} onClick={addService}>
-              Hizmet Ekle
-            </button>
-          </section>
-
-          <section style={styles.card}>
-            <h2 style={styles.cardTitle}>Randevu Oluştur</h2>
-
-            <select
-              style={styles.input}
-              value={selectedService}
-              onChange={(e) => setSelectedService(e.target.value)}
-            >
-              <option value="">Hizmet seç</option>
-              {services.map((service) => (
-                <option key={service.id} value={service.id}>
-                  {service.name} - {service.price} TL
-                </option>
-              ))}
-            </select>
-
-            <input
-              style={styles.input}
-              placeholder="Müşteri adı"
-              value={clientName}
-              onChange={(e) => setClientName(e.target.value)}
-            />
-
-            <input
-              style={styles.input}
-              placeholder="Telefon örn: 5551234567"
-              value={clientPhone}
-              onChange={(e) => setClientPhone(e.target.value)}
-            />
-
-            <input
-              style={styles.input}
-              type="datetime-local"
-              value={appointmentDate}
-              onChange={(e) => setAppointmentDate(e.target.value)}
-            />
-
-            <button style={styles.primaryButton} onClick={addAppointment}>
-              Randevu Oluştur
-            </button>
-          </section>
-        </div>
-
-        <section style={styles.card}>
-          <h2 style={styles.cardTitle}>Hizmetler</h2>
-
-          {!currentBusiness && <p style={styles.muted}>Önce işletme oluştur.</p>}
-
-          {currentBusiness && services.length === 0 && (
-            <p style={styles.muted}>Bu işletmeye henüz hizmet eklenmedi.</p>
-          )}
-
-          <div style={styles.listGrid}>
-            {services.map((service) => (
-              <div key={service.id} style={styles.serviceItem}>
-                <b>{service.name}</b>
-                <span>{service.price} TL</span>
-                <small>{service.duration} dk</small>
+              <button style={styles.button} onClick={createBusiness}>İşletme Oluştur</button>
+            </>
+          ) : (
+            <>
+              <div style={styles.businessBox}>
+                <h2 style={styles.sectionTitle}>{business.business_name}</h2>
+                <p style={styles.text}>Plan: {business.plan}</p>
+                <p style={styles.linkBox}>
+                  https://stackblitz-starters-4mmn4n6l.vercel.app/randevu?business={business.slug}
+                </p>
               </div>
-            ))}
-          </div>
-        </section>
 
-        <section style={styles.card}>
-          <h2 style={styles.cardTitle}>Randevular</h2>
+              <section style={styles.section}>
+                <h2 style={styles.sectionTitle}>Hizmet Ekle</h2>
 
-          {!currentBusiness && <p style={styles.muted}>Önce işletme oluştur.</p>}
+                <input style={styles.input} placeholder="Hizmet adı" value={serviceName} onChange={(e) => setServiceName(e.target.value)} />
+                <input style={styles.input} placeholder="Fiyat" value={servicePrice} onChange={(e) => setServicePrice(e.target.value)} />
+                <input style={styles.input} placeholder="Süre dk" value={serviceDuration} onChange={(e) => setServiceDuration(e.target.value)} />
 
-          {currentBusiness && appointments.length === 0 && (
-            <p style={styles.muted}>Bu işletmeye henüz randevu yok.</p>
+                <button style={styles.button} onClick={addService}>Hizmet Ekle</button>
+              </section>
+
+              <section style={styles.section}>
+                <h2 style={styles.sectionTitle}>Hizmetler</h2>
+
+                {services.length === 0 && <p style={styles.text}>Henüz hizmet yok.</p>}
+
+                {services.map((service) => (
+                  <div key={service.id} style={styles.item}>
+                    <b>{service.name}</b>
+                    <p>{service.price} TL - {service.duration} dk</p>
+                  </div>
+                ))}
+              </section>
+
+              <section style={styles.section}>
+                <h2 style={styles.sectionTitle}>Randevular</h2>
+
+                {appointments.length === 0 && <p style={styles.text}>Henüz randevu yok.</p>}
+
+                {appointments.map((appointment) => {
+                  const service = findService(appointment.service_id)
+
+                  return (
+                    <div key={appointment.id} style={styles.item}>
+                      <b>{appointment.client_name}</b>
+                      <p>📞 {appointment.client_phone}</p>
+                      <p>🗓️ {appointment.appointment_date}</p>
+                      <p>💅 {service ? `${service.name} - ${service.price} TL` : 'Hizmet bulunamadı'}</p>
+
+                      <button style={styles.whatsappButton} onClick={() => sendWhatsApp(appointment)}>
+                        WhatsApp Hatırlatma
+                      </button>
+                    </div>
+                  )
+                })}
+              </section>
+            </>
           )}
 
-          <div style={styles.appointmentList}>
-            {appointments.map((appointment) => {
-              const service = findService(appointment.service_id)
-
-              return (
-                <div key={appointment.id} style={styles.appointmentItem}>
-                  <div>
-                    <b>{appointment.client_name}</b>
-                    <p style={styles.muted}>📞 {appointment.client_phone}</p>
-                    <p style={styles.muted}>🗓️ {appointment.appointment_date}</p>
-                    <p style={styles.muted}>
-                      💅 {service ? `${service.name} - ${service.price} TL` : 'Hizmet bulunamadı'}
-                    </p>
-                  </div>
-
-                  <button
-                    style={styles.whatsappButton}
-                    onClick={() => sendWhatsAppReminder(appointment)}
-                  >
-                    WhatsApp
-                  </button>
-                </div>
-              )
-            })}
-          </div>
-        </section>
+          <button style={styles.logoutButton} onClick={signOut}>Çıkış Yap</button>
+        </div>
       </div>
     </main>
   )
@@ -372,77 +251,32 @@ const styles: any = {
   page: {
     minHeight: '100vh',
     background: 'linear-gradient(135deg, #fff7fb 0%, #f4f0ff 45%, #eef7ff 100%)',
-    color: '#151515',
-    fontFamily: 'Arial, sans-serif',
     padding: 20,
+    fontFamily: 'Arial',
+    color: '#111',
   },
   wrapper: {
-    maxWidth: 980,
+    maxWidth: 760,
     margin: '0 auto',
   },
-  header: {
-    display: 'flex',
-    justifyContent: 'space-between',
-    gap: 16,
-    alignItems: 'center',
-    marginBottom: 20,
-  },
-  badge: {
-    display: 'inline-block',
-    background: '#111',
-    color: 'white',
-    padding: '7px 12px',
-    borderRadius: 999,
-    fontSize: 13,
-    marginBottom: 8,
+  card: {
+    background: 'white',
+    borderRadius: 24,
+    padding: 28,
+    boxShadow: '0 14px 35px rgba(0,0,0,0.08)',
   },
   title: {
-    fontSize: 42,
-    margin: 0,
+    fontSize: 38,
+    marginBottom: 8,
     color: '#111',
   },
-  subtitle: {
-    color: '#555',
-    maxWidth: 560,
-    lineHeight: 1.5,
-  },
-  statBox: {
-    background: 'white',
-    borderRadius: 20,
-    padding: 18,
-    minWidth: 110,
-    textAlign: 'center',
-    boxShadow: '0 12px 30px rgba(0,0,0,0.08)',
-    display: 'flex',
-    flexDirection: 'column',
+  sectionTitle: {
     color: '#111',
-  },
-  linkCard: {
-    background: '#111',
-    color: 'white',
-    borderRadius: 24,
-    padding: 22,
-    marginBottom: 18,
-    boxShadow: '0 14px 35px rgba(0,0,0,0.14)',
-  },
-  grid: {
-    display: 'grid',
-    gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))',
-    gap: 18,
-  },
-  card: {
-    background: 'rgba(255,255,255,0.92)',
-    border: '1px solid rgba(255,255,255,0.8)',
-    borderRadius: 24,
-    padding: 22,
-    marginBottom: 18,
-    boxShadow: '0 14px 35px rgba(0,0,0,0.08)',
-    color: '#111',
-  },
-  cardTitle: {
-    marginTop: 0,
     marginBottom: 12,
-    color: '#111',
+  },
+  text: {
+    color: '#666',
+    marginBottom: 16,
   },
   input: {
     width: '100%',
@@ -455,7 +289,7 @@ const styles: any = {
     background: 'white',
     boxSizing: 'border-box',
   },
-  primaryButton: {
+  button: {
     width: '100%',
     padding: 14,
     borderRadius: 14,
@@ -464,69 +298,62 @@ const styles: any = {
     color: 'white',
     fontSize: 16,
     cursor: 'pointer',
+    marginBottom: 10,
     fontWeight: 700,
   },
-  whiteButton: {
+  secondaryButton: {
     width: '100%',
     padding: 14,
     borderRadius: 14,
-    border: 'none',
+    border: '1px solid #111',
     background: 'white',
     color: '#111',
     fontSize: 16,
     cursor: 'pointer',
     fontWeight: 700,
   },
-  whatsappButton: {
-    padding: '11px 14px',
+  logoutButton: {
+    width: '100%',
+    padding: 14,
     borderRadius: 14,
+    border: '1px solid #111',
+    background: 'white',
+    color: '#111',
+    fontSize: 16,
+    cursor: 'pointer',
+    marginTop: 15,
+  },
+  businessBox: {
+    background: '#f7f7fb',
+    padding: 18,
+    borderRadius: 18,
+    marginBottom: 18,
+  },
+  linkBox: {
+    wordBreak: 'break-all',
+    background: 'white',
+    padding: 12,
+    borderRadius: 12,
+    color: '#111',
+    border: '1px solid #eee',
+  },
+  section: {
+    marginTop: 24,
+  },
+  item: {
+    background: '#fafafa',
+    border: '1px solid #eee',
+    padding: 14,
+    borderRadius: 14,
+    marginBottom: 12,
+  },
+  whatsappButton: {
+    padding: 10,
+    borderRadius: 10,
     border: 'none',
     background: '#25D366',
     color: 'white',
     cursor: 'pointer',
     fontWeight: 700,
-  },
-  muted: {
-    color: '#666',
-    margin: '5px 0',
-  },
-  successBox: {
-    marginTop: 12,
-    background: '#ecfff3',
-    border: '1px solid #baf7ce',
-    borderRadius: 14,
-    padding: 12,
-    color: '#111',
-  },
-  listGrid: {
-    display: 'grid',
-    gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))',
-    gap: 12,
-  },
-  serviceItem: {
-    border: '1px solid #eee',
-    borderRadius: 18,
-    padding: 16,
-    display: 'flex',
-    flexDirection: 'column',
-    gap: 6,
-    background: 'white',
-    color: '#111',
-  },
-  appointmentList: {
-    display: 'flex',
-    flexDirection: 'column',
-    gap: 12,
-  },
-  appointmentItem: {
-    border: '1px solid #eee',
-    borderRadius: 18,
-    padding: 16,
-    background: 'white',
-    color: '#111',
-    display: 'flex',
-    justifyContent: 'space-between',
-    gap: 12,
-    alignItems: 'center',
   },
 }
